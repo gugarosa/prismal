@@ -1,13 +1,12 @@
 // @ts-check
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { execFile } from "node:child_process";
 import { dirname, join, relative, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 import { ESLint } from "eslint";
 import ts from "typescript";
+import { runNpm } from "./npm.js";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const runtimeOwners = ["bin", "lib", "shell", "client"];
@@ -101,13 +100,40 @@ test("lint distinguishes browser, Node and shared-shell scopes", async () => {
   assert.ok(node.messages.some((message) => message.ruleId === "no-undef"));
 });
 
+test("type checking rejects invalid generated data, frame records and commands", async (t) => {
+  const directory = await mkdtemp(join(root, ".prismal-types-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const file = join(directory, "probe.js");
+  await writeFile(
+    file,
+    `// @ts-check
+    function probeContracts() {
+      manifest.round = "wrong";
+      frameRecords.set("frame", {});
+      sendFrame(frameRecords.get("frame").active, {type: "unsupported"});
+    }`,
+  );
+  const configFile = ts.readConfigFile(join(root, "jsconfig.json"), ts.sys.readFile);
+  assert.equal(configFile.error, undefined);
+  const config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, root);
+  assert.deepEqual(config.errors, []);
+  const program = ts.createProgram([...config.fileNames, file], config.options);
+  const errors = ts
+    .getPreEmitDiagnostics(program)
+    .filter((entry) => entry.file && resolve(entry.file.fileName) === file);
+  assert.deepEqual(
+    errors.map((entry) => entry.code),
+    [2322, 2345, 2322],
+  );
+});
+
 test("Markdown verification rejects broken local paths and heading fragments", async (t) => {
   const directory = await mkdtemp(join(root, ".prismal-docs-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const file = join(directory, "probe.md");
   await writeFile(file, "# Probe\n\n[Missing](missing.md)\n\n[Wrong section](#unknown)\n");
   await assert.rejects(
-    promisify(execFile)("npm", ["run", "lint:docs", "--", "--no-globs", file], { cwd: root }),
+    runNpm(["run", "lint:docs", "--", "--no-globs", file], { cwd: root }),
     (error) =>
       error.code === 1 &&
       /relative-links/.test(error.stderr + error.stdout) &&

@@ -30,7 +30,7 @@
     "test": "node --test test/*.test.js",
     "test:e2e": "node --test test/e2e/*.test.js",
     "check:example": "node bin/prismal.js check examples/lumen/prismal.json",
-    "check:types": "tsc --allowJs --checkJs --noEmit --target es2022 --lib es2022,dom,dom.iterable --module nodenext --moduleResolution nodenext --moduleDetection legacy --skipLibCheck bin/*.js lib/*.js client/*.js shell/*.js",
+    "check:types": "tsc -p jsconfig.json",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

@@ -6,7 +6,6 @@
     <style>
       body {
         margin: 0;
-        font: 20px system-ui;
       }
       main {
         padding: 40px;
@@ -15,8 +14,14 @@
   </head>
   <body>
     <main>
-      <h1>Nothing changed</h1>
-      <p>This option intentionally looks exactly like Now.</p>
+      <!-- Avoid platform font rasterization differences in an exact-image fixture. -->
+      <svg width="320" height="180" viewBox="0 0 320 180" role="img" aria-label="Nothing changed">
+        <title>This option intentionally looks exactly like Now.</title>
+        <rect width="320" height="180" fill="#f2f4f7" />
+        <rect x="24" y="24" width="272" height="40" fill="#475467" />
+        <rect x="24" y="88" width="160" height="16" fill="#98a2b3" />
+        <rect x="24" y="120" width="224" height="16" fill="#98a2b3" />
+      </svg>
     </main>
   </body>
 </html>

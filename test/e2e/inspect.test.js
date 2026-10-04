@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
-import { clickPreview, launchBrowser } from "./browser.js";
+import { clickPreview, hoverPreview, launchBrowser } from "./browser.js";
 import { build } from "../../lib/build.js";
 
 let browser, directory, lab;
@@ -165,6 +165,52 @@ test("specificity, explicit names and accessible fallback names work without int
     click: 1,
   });
   assert.equal(await frame.locator("body").evaluate(() => window.instance), instance);
+  await page.close();
+});
+test("full-page Inspect repaints hover after pointer and content changes", async () => {
+  await writeFile(
+    join(directory, "hover.html"),
+    `<!doctype html>
+      <style>body{margin:24px;height:1500px}button{margin-top:120px;padding:16px}</style>
+      <button data-prismal-name="Continue action">Continue</button>`,
+  );
+  const manifest = join(directory, "hover.json");
+  await writeFile(
+    manifest,
+    JSON.stringify({
+      title: "Hover",
+      round: 1,
+      decisions: [],
+      inspect: [{ label: "Page", file: "hover.html" }],
+    }),
+  );
+  const built = await build(manifest, { output: join(directory, "hover-lab.html") });
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1100 } });
+  await page.goto(`${pathToFileURL(built.output).href}#/inspect`);
+  const card = page.locator(".frame-card");
+  await ready(page, card);
+  const iframe = card.locator("iframe");
+  const frame = iframe.contentFrame();
+  await hoverPreview(page, iframe, "button");
+  const ring = frame.locator("[data-prismal-ring=hover]");
+  await ring.waitFor({ state: "visible", timeout: 1500 });
+  assert.equal(await ring.textContent(), "Continue action");
+  const previousTop = await ring.evaluate((element) => element.getBoundingClientRect().top);
+  await frame.locator("body").evaluate((body) => {
+    const spacer = document.createElement("div");
+    spacer.style.height = "30px";
+    body.prepend(spacer);
+  });
+  const geometry = await ring.evaluate(async (element) => {
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    const target = document.querySelector("button").getBoundingClientRect();
+    const outline = element.getBoundingClientRect();
+    return { top: outline.top, delta: Math.abs(target.top - outline.top) };
+  });
+  assert.equal(geometry.top, previousTop + 30);
+  assert.ok(geometry.delta < 2, `Hover ring missed the moved target by ${geometry.delta}px`);
+  await page.getByRole("button", { name: "Inspect on", exact: true }).click();
+  await ring.waitFor({ state: "hidden" });
   await page.close();
 });
 test("journey targets have labeled rings at laptop and phone size; verdicts and notes export", async () => {

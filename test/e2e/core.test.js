@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
 import { clickPreview, launchBrowser } from "./browser.js";
 import { build } from "../../lib/build.js";
+import { choicesSchema, valid } from "../schema.js";
 
 let browser, directory, lab;
 before(async () => {
@@ -70,6 +71,7 @@ test("offline decisions: real variants, keys, comparison, notes, export, import 
   const download = await downloadEvent;
   assert.equal(download.suggestedFilename(), "prismal-choices-r1.json");
   const exported = JSON.parse(await readFile(await download.path(), "utf8"));
+  assert.equal(valid(choicesSchema, exported), true);
   assert.equal(exported.prismal, 1);
   assert.equal(exported.decisions[0].pick, "b");
   assert.deepEqual(exported.decisions[0].liked, ["b"]);
