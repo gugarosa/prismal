@@ -100,6 +100,33 @@ test("lint distinguishes browser, Node and shared-shell scopes", async () => {
   assert.ok(node.messages.some((message) => message.ruleId === "no-undef"));
 });
 
+test("type checking rejects invalid generated data, frame records and commands", async (t) => {
+  const directory = await mkdtemp(join(root, ".prismal-types-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const file = join(directory, "probe.js");
+  await writeFile(
+    file,
+    `// @ts-check
+    function probeContracts() {
+      manifest.round = "wrong";
+      frameRecords.set("frame", {});
+      sendFrame(frameRecords.get("frame").active, {type: "unsupported"});
+    }`,
+  );
+  const configFile = ts.readConfigFile(join(root, "jsconfig.json"), ts.sys.readFile);
+  assert.equal(configFile.error, undefined);
+  const config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, root);
+  assert.deepEqual(config.errors, []);
+  const program = ts.createProgram([...config.fileNames, file], config.options);
+  const errors = ts
+    .getPreEmitDiagnostics(program)
+    .filter((entry) => entry.file && resolve(entry.file.fileName) === file);
+  assert.deepEqual(
+    errors.map((entry) => entry.code),
+    [2322, 2345, 2322],
+  );
+});
+
 test("Markdown verification rejects broken local paths and heading fragments", async (t) => {
   const directory = await mkdtemp(join(root, ".prismal-docs-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
