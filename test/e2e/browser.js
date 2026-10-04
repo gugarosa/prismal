@@ -11,7 +11,7 @@ export function launchBrowser() {
 }
 
 /** Stable Chromium channels report unscaled frame locator boxes; use the real viewport transform. */
-export async function clickPreview(page, iframe, selector) {
+async function previewPoint(page, iframe, selector) {
   const target = iframe.contentFrame().locator(selector).first();
   await target.scrollIntoViewIfNeeded();
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
@@ -24,8 +24,18 @@ export async function clickPreview(page, iframe, selector) {
   });
   const box = await iframe.boundingBox();
   const scale = box.width / rect.viewport;
-  await page.mouse.click(
-    box.x + (rect.x + rect.width / 2) * scale,
-    box.y + (rect.y + rect.height / 2) * scale,
-  );
+  return {
+    x: box.x + (rect.x + rect.width / 2) * scale,
+    y: box.y + (rect.y + rect.height / 2) * scale,
+  };
+}
+
+export async function clickPreview(page, iframe, selector) {
+  const point = await previewPoint(page, iframe, selector);
+  await page.mouse.click(point.x, point.y);
+}
+
+export async function hoverPreview(page, iframe, selector) {
+  const point = await previewPoint(page, iframe, selector);
+  await page.mouse.move(point.x, point.y);
 }

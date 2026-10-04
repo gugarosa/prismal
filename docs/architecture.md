@@ -64,6 +64,8 @@ newer frames. `aria-busy` represents the pending generation, not the retained ol
 The [page patcher](../shell/pages.js) preserves attached iframe nodes; detaching one resets its browsing context.
 The client measures after layout, load and fonts, suppresses size changes below two pixels and caps height at 30,000.
 Laptop views scale to their column; full phone views scroll within the device viewport. Focus crops use target rectangles.
+In `client/prismal.js`, `refresh()` resolves highlights, measures size and focus, then paints overlays independently.
+Hover and selection outlines repaint even when there is no focus selector or the document size has not changed.
 
 ## Choices
 
@@ -77,8 +79,6 @@ journey feedback uses journey and one-based step. Notes, words and answers share
 
 ## Inspect limitations
 
-- In [`measure()`](../client/prismal.js), outline repainting is gated by a focus selector.
-  Full-page Inspect has no focus target, so hover feedback does not repaint reliably. Clicking still selects an element.
 - [`inspectMessage()`](../shell/inspect.js) receives frame routes but does not synchronize the route picker after
   in-frame navigation. Select the intended route explicitly; feedback records carry the actual frame route.
 - Previous/Next cycles instances of the selected name, not the catalog. Inventory entries have no review-completion

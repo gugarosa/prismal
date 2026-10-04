@@ -294,11 +294,7 @@
         label: typeof value.label === "string" ? value.label : "",
       };
       try {
-        const element = matches(value.selector)[0];
-        if (element) {
-          highlighted = { element, label: highlightRequest.label };
-          reveal(element);
-        }
+        updateHighlight();
       } catch (error) {
         highlightRequest = null;
         post({ type: "error", message: `Invalid highlight selector: ${message(error)}` });
@@ -307,10 +303,7 @@
     outlines();
     schedule();
   }
-  function measure(force = false) {
-    const root = document.documentElement;
-    const body = document.body;
-    if (!body) return;
+  function updateHighlight() {
     if (highlightRequest && (!highlighted?.element.isConnected || !visible(highlighted.element))) {
       const element = matches(highlightRequest.selector)[0];
       if (element) {
@@ -318,6 +311,11 @@
         reveal(element);
       }
     }
+  }
+  function measureSize(force = false) {
+    const root = document.documentElement;
+    const body = document.body;
+    if (!body) return;
     const width = Math.max(root.scrollWidth, body.scrollWidth);
     const height = Math.min(30000, Math.max(root.scrollHeight, body.scrollHeight));
     if (force || Math.abs(width - lastWidth) >= 2 || Math.abs(height - lastHeight) >= 2) {
@@ -325,32 +323,38 @@
       lastWidth = width;
       lastHeight = height;
     }
-    if (focus) {
-      try {
-        const target = matches(focus)[0];
-        if (target) {
-          const rect = target.getBoundingClientRect();
-          post({
-            type: "rect",
-            top: rect.top + scrollY,
-            left: rect.left + scrollX,
-            width: rect.width,
-            height: rect.height,
-          });
-        }
-        outlines();
-      } catch (error) {
-        post({ type: "error", message: `Invalid focus selector: ${message(error)}` });
-        focus = "";
+  }
+  function measureFocus() {
+    if (!focus) return;
+    try {
+      const target = matches(focus)[0];
+      if (target) {
+        const rect = target.getBoundingClientRect();
+        post({
+          type: "rect",
+          top: rect.top + scrollY,
+          left: rect.left + scrollX,
+          width: rect.width,
+          height: rect.height,
+        });
       }
+    } catch (error) {
+      post({ type: "error", message: `Invalid focus selector: ${message(error)}` });
+      focus = "";
     }
+  }
+  function refresh(force = false) {
+    updateHighlight();
+    measureSize(force);
+    measureFocus();
+    outlines();
   }
   function schedule() {
     if (pending) return;
     pending = true;
     requestAnimationFrame(() => {
       pending = false;
-      measure();
+      refresh();
     });
   }
   addEventListener("message", (event) => {
@@ -360,7 +364,7 @@
       inspecting = Boolean(event.data.inspect);
       focus = typeof event.data.focus === "string" ? event.data.focus : "";
       highlight(event.data.highlight);
-      measure(true);
+      refresh(true);
     } else if (event.data.type === "inspect") {
       inspecting = Boolean(event.data.on);
       hovered = null;
@@ -415,7 +419,7 @@
   });
   function ready() {
     post({ type: "ready", title: document.title, route: route() });
-    measure(true);
+    refresh(true);
     const observer = new ResizeObserver(schedule);
     observer.observe(document.documentElement);
     if (document.body) observer.observe(document.body);
@@ -431,11 +435,11 @@
       schedule();
       if (elements.length || inspecting) inventory();
     }).observe(document.documentElement, { childList: true, subtree: true });
-    document.fonts.ready.then(() => measure(true));
+    document.fonts.ready.then(() => refresh(true));
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });
   else queueMicrotask(ready);
-  addEventListener("load", () => measure(true));
+  addEventListener("load", () => refresh(true));
   addEventListener("resize", schedule);
   addEventListener("scroll", schedule, { passive: true });
   addEventListener("hashchange", () => {
