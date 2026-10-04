@@ -231,9 +231,13 @@ test("loadManifest reads explicit paths and distinguishes lookup failures", asyn
   assert.equal(loaded.manifest.title, "Round one");
 
   await writeFile(explicit, "{");
-  await assert.rejects(loadManifest(explicit), new RegExp(`^Error: Invalid JSON in manifest ${explicit}:`));
+  await assert.rejects(loadManifest(explicit), (error) =>
+    error.message.startsWith(`Invalid JSON in manifest ${explicit}:`),
+  );
   await writeFile(explicit, JSON.stringify({ title: "", round: 1, decisions: [] }));
-  await assert.rejects(loadManifest(explicit), new RegExp(`^Error: Invalid manifest ${explicit}: title:`));
+  await assert.rejects(loadManifest(explicit), (error) =>
+    error.message.startsWith(`Invalid manifest ${explicit}: title:`),
+  );
 
   const nested = join(root, "prismal");
   await mkdir(nested);

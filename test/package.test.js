@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { runNpm } from "./npm.js";
 
 test("package has no runtime dependencies and supports Node 20", async () => {
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
@@ -35,11 +36,10 @@ test("a packed install builds without dependencies and resolves optional checker
   const project = join(root, "app");
   await mkdir(project);
   const repository = fileURLToPath(new URL("..", import.meta.url));
-  const packed = await exec("npm", ["pack", "--json", "--pack-destination", root], { cwd: repository });
+  const packed = await runNpm(["pack", "--json", "--pack-destination", root], { cwd: repository });
   const archive = join(root, JSON.parse(packed.stdout)[0].filename);
   await writeFile(join(project, "package.json"), '{"name":"fictional-app","private":true}');
-  await exec(
-    "npm",
+  await runNpm(
     [
       "install",
       archive,
@@ -54,7 +54,7 @@ test("a packed install builds without dependencies and resolves optional checker
   );
   const cli = join(project, "node_modules/prismal/bin/prismal.js");
   const run = (args) => exec(process.execPath, [cli, ...args], { cwd: project });
-  const invocation = await exec("npm", ["exec", "--offline", "--no", "--", "prismal", "--version"], {
+  const invocation = await runNpm(["exec", "--offline", "--no", "--", "prismal", "--version"], {
     cwd: project,
   });
   assert.equal(invocation.stdout.trim(), "0.1.0");
@@ -109,7 +109,7 @@ test("a packed install builds without dependencies and resolves optional checker
 });
 test("the package contains only intended files, including every required build input", async () => {
   const root = fileURLToPath(new URL("..", import.meta.url));
-  const { stdout } = await promisify(execFile)("npm", ["pack", "--dry-run", "--json"], { cwd: root });
+  const { stdout } = await runNpm(["pack", "--dry-run", "--json"], { cwd: root });
   const files = JSON.parse(stdout)[0].files.map((file) => file.path);
   const allowed = new Set([
     "bin",

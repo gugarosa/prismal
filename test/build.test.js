@@ -115,7 +115,9 @@ test("build deduplicates expanded files and safely assembles the lab", async (t)
 
 test("build creates explicit output directories and protects every input", async (t) => {
   const root = await workspace(t);
-  const source = join(root, "page.html");
+  const sources = join(root, "sources");
+  await mkdir(sources);
+  const source = join(sources, "page.html");
   const manifestPath = join(root, "prismal.json");
   await writeFile(source, "<!doctype html><p>Page</p>");
   await writeManifest(manifestPath, {
@@ -126,7 +128,7 @@ test("build creates explicit output directories and protects every input", async
         id: "page",
         title: "Page",
         question: "Which page?",
-        views: [{ caption: "Page", file: "page.html#route" }],
+        views: [{ caption: "Page", file: "sources/page.html#route" }],
         options: [{ id: "new", name: "New" }],
       },
     ],
@@ -138,8 +140,9 @@ test("build creates explicit output directories and protects every input", async
   await assert.rejects(build(manifestPath, { output: source }), {
     message: `Refusing to overwrite build input ${source}`,
   });
-  const alias = join(root, "source-alias.html");
-  await symlink(source, alias);
+  const aliasDirectory = join(root, "source-alias");
+  await symlink(sources, aliasDirectory, process.platform === "win32" ? "junction" : "dir");
+  const alias = join(aliasDirectory, "page.html");
   await assert.rejects(build(manifestPath, { output: alias }), /Refusing to overwrite build input/);
   const output = join(root, "nested", "review", "lab.html");
   const result = await build(manifestPath, { output });
